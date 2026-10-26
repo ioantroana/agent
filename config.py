@@ -9,7 +9,7 @@ PROJECT_ROOT = os.getcwd()
 SANDBOX_ROOT = os.path.join(PROJECT_ROOT, "sandboxed")
 
 # Everything that happens is logged here, for debugging
-LOG_FILE = os.path.join(PROJECT_ROOT, "logs", "agent.log")
+LOG_DIR = os.path.join(PROJECT_ROOT, "logs")  # each run writes its own file in here
 LOG_LEVEL = "DEBUG"  # DEBUG logs the most; INFO only the main events
 
 MODEL = "claude-haiku-5-5"
@@ -19,8 +19,8 @@ SYSTEM_PROMPT = (
     f"You are a helpful assistant. The current working directory is {PROJECT_ROOT}. "
     f"You can only list, read, write and edit files inside {SANDBOX_ROOT}. "
     "Give tool paths relative to that folder, e.g. 'notes.txt'. "
-    "Changes to files are checked by a reviewer first; if one is blocked, "
-    "you get the reason back and should not try to work around it."
+    "Changes to files are checked by a reviewer first. If one is blocked, "
+    "do not try to work around it: tell the user it was blocked and stop."
 )
 
 # The reviewer checks every change before it runs

@@ -1,15 +1,16 @@
 import logging
 import os
-from logging.handlers import RotatingFileHandler
+from datetime import datetime
 
-from config import LOG_FILE, LOG_LEVEL
+from config import LOG_DIR, LOG_LEVEL
 
-def setup_logging() -> None:
-    """Send all log records to LOG_FILE. Call once, at startup."""
-    os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+def setup_logging() -> str:
+    """Send all log records to a new file for this run. Call once, at startup. Returns the file path."""
+    os.makedirs(LOG_DIR, exist_ok=True)
 
-    # Start a new file at 5 MB and keep the 3 previous ones (agent.log.1, .2, .3)
-    handler = RotatingFileHandler(LOG_FILE, maxBytes=5_000_000, backupCount=3, encoding="utf-8")
+    # One file per run, named by start time, e.g. logs/agent_2026-10-26_07-15-02.log
+    log_file = os.path.join(LOG_DIR, f"agent_{datetime.now():%Y-%m-%d_%H-%M-%S}.log")
+    handler = logging.FileHandler(log_file, encoding="utf-8")
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)-7s %(name)s: %(message)s"))
 
     root = logging.getLogger()
@@ -19,6 +20,8 @@ def setup_logging() -> None:
     # Library loggers are very chatty at DEBUG, and could log request details we don't want on disk
     for name in ("anthropic", "httpx2", "httpcore2"):
         logging.getLogger(name).setLevel(logging.WARNING)
+
+    return log_file
 
 def shorten(value: object, limit: int = 500) -> str:
     """Keep log lines readable when a value (like file content) is long."""

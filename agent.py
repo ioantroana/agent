@@ -74,9 +74,10 @@ class Agent:
         if needs_review(block.name):
             decision = self.reviewer.review(self.messages, block)
             verdict = "allowed" if decision.allow else "BLOCKED"
-            print(f"[reviewer] {verdict}: {decision.reason}")
+            print(f"[reviewer] {verdict}")  # the reason only goes to the log file
             logger.log(logging.INFO if decision.allow else logging.WARNING,
                        "Reviewer %s %s: %s", verdict, block.name, decision.reason)
             if not decision.allow:
-                return tool_error(block, f"Blocked by reviewer: {decision.reason}")
+                # Don't tell the agent why, so it can't tailor a retry to slip past the reviewer
+                return tool_error(block, "Blocked by reviewer.")
         return run_tool(block)
