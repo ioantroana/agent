@@ -61,7 +61,7 @@ class ListFiles(Tool[ListFilesInput]):
         full_path = resolve_path(args.path, SANDBOX_ROOT)
         if not os.path.exists(SANDBOX_ROOT):
             return "(sandbox is empty)"  # write_file creates the folder on first use
-        entries = []
+        entries: list[str] = []
         for name in sorted(os.listdir(full_path)):
             if os.path.isdir(os.path.join(full_path, name)):
                 name += "/"

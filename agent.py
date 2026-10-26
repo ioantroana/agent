@@ -2,8 +2,9 @@ import anthropic
 from anthropic.types import MessageParam, ToolResultBlockParam, ToolUseBlock
 
 from config import MODEL, MAX_TOKENS, SYSTEM_PROMPT
+from messages import tool_error, user_message
 from reviewer import Reviewer
-from tools import error_result, get_definitions, needs_review, run_tool
+from tools import get_definitions, needs_review, run_tool
 
 class Agent:
     def __init__(self) -> None:
@@ -14,7 +15,7 @@ class Agent:
     def send(self, user_input: str) -> None:
         """Handle one user message: call the model and run tools until it's done."""
         turn_start = len(self.messages)  # so we can roll back this whole turn if the API fails
-        self.messages.append({"role": "user", "content": user_input})
+        self.messages.append(user_message(user_input))
 
         while True:
             try:
@@ -35,7 +36,7 @@ class Agent:
                 del self.messages[turn_start:]  # drop the unfinished turn so history stays valid
                 return
 
-            self.messages.append({"role": "assistant", "content": response.content})
+            self.messages.append(response.to_param())
 
             if response.stop_reason != "tool_use":
                 return
@@ -46,7 +47,7 @@ class Agent:
                 if isinstance(block, ToolUseBlock):
                     tool_results.append(self.handle_tool_call(block))
 
-            self.messages.append({"role": "user", "content": tool_results})
+            self.messages.append(user_message(tool_results))
 
     def handle_tool_call(self, block: ToolUseBlock) -> ToolResultBlockParam:
         """Ask the reviewer if needed, then run the tool."""
@@ -56,5 +57,5 @@ class Agent:
             verdict = "allowed" if decision.allow else "BLOCKED"
             print(f"[reviewer] {verdict}: {decision.reason}")
             if not decision.allow:
-                return error_result(block, f"Blocked by reviewer: {decision.reason}")
+                return tool_error(block, f"Blocked by reviewer: {decision.reason}")
         return run_tool(block)

@@ -5,6 +5,7 @@ from anthropic.types import MessageParam, TextBlock, ToolUseBlock
 from pydantic import BaseModel
 
 from config import REVIEWER_MODEL, REVIEWER_PROMPT, REVIEWER_HISTORY
+from messages import user_message
 
 class Decision(BaseModel):
     allow: bool
@@ -16,7 +17,7 @@ def build_transcript(messages: list[MessageParam]) -> str:
     Tool results (like file contents) are left out on purpose: they can contain
     text written by anyone, and we don't want that text steering the reviewer.
     """
-    lines = []
+    lines: list[str] = []
     for message in messages:
         content = message["content"]
         if message["role"] == "user":
@@ -45,7 +46,7 @@ class Reviewer:
                 model=REVIEWER_MODEL,
                 system=REVIEWER_PROMPT,
                 max_tokens=1024,
-                messages=[{"role": "user", "content": proposal}],
+                messages=[user_message(proposal)],
                 output_format=Decision,
             )
         except anthropic.APIError as e:
