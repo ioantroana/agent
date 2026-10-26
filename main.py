@@ -3,6 +3,7 @@ import logging
 
 from agent import Agent
 from logging_setup import setup_logging
+from ui import TerminalUI
 
 logger = logging.getLogger("main")  # __name__ would be "__main__" when this file is run directly
 
@@ -38,7 +39,7 @@ def main() -> None:
     args = parse_args()
     log_file = setup_logging()
     logger.info("Session started, logging to %s", log_file)
-    agent = Agent()
+    agent = Agent(TerminalUI())
 
     if args.message:
         run_once(agent, args.message)
