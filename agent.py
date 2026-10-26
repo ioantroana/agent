@@ -78,10 +78,21 @@ class Agent:
         return run_tool(block)
 
     def _is_allowed(self, block: ToolUseBlock) -> bool:
-        """Ask the reviewer about this tool call. The reason only goes to the log file."""
+        """Ask the reviewer about this tool call; if it says no, the user gets the final say.
+
+        The reviewer's reason only goes to the log file.
+        """
         decision = self.reviewer.review(self.messages, block)
         verdict = "allowed" if decision.allow else "BLOCKED"
         self.ui.review(block.name, decision.allow)
         logger.log(logging.INFO if decision.allow else logging.WARNING,
                    "Reviewer %s %s: %s", verdict, block.name, decision.reason)
-        return decision.allow
+        if decision.allow:
+            return True
+
+        overridden = self.ui.confirm(f"The reviewer blocked {block.name}. Allow it anyway?")
+        if overridden:
+            logger.warning("User overrode the reviewer: allowing %s", block.name)
+        else:
+            logger.info("User kept the block on %s", block.name)
+        return overridden

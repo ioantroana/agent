@@ -17,6 +17,10 @@ class AgentUI(Protocol):
 
     def error(self, message: str) -> None: ...
 
+    def confirm(self, question: str) -> bool:
+        """Ask the user a yes/no question. Anything other than a clear yes means no."""
+        ...
+
 
 class TerminalUI(AgentUI):
     """Shows the agent's work in the terminal."""
@@ -44,3 +48,12 @@ class TerminalUI(AgentUI):
     def error(self, message: str) -> None:
         self.text_done()  # end a half-printed reply first
         print(f"Error: {message}")
+
+    def confirm(self, question: str) -> bool:
+        self.text_done()
+        try:
+            answer = input(f"{question} [y/N] ")
+        except (KeyboardInterrupt, EOFError):  # Ctrl+C, Ctrl+D, or no terminal to ask (e.g. piped input)
+            print()
+            return False
+        return answer.strip().lower() in ("y", "yes")
