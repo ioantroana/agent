@@ -8,12 +8,16 @@ PROJECT_ROOT = os.getcwd()
 # read_file and write_file can only touch files inside this folder
 SANDBOX_ROOT = os.path.join(PROJECT_ROOT, "sandboxed")
 
+# Everything that happens is logged here, for debugging
+LOG_FILE = os.path.join(PROJECT_ROOT, "logs", "agent.log")
+LOG_LEVEL = "DEBUG"  # DEBUG logs the most; INFO only the main events
+
 MODEL = "claude-haiku-5-5"
 MAX_TOKENS = 16000
 
 SYSTEM_PROMPT = (
     f"You are a helpful assistant. The current working directory is {PROJECT_ROOT}. "
-    f"You can only list, read and write files inside {SANDBOX_ROOT}. "
+    f"You can only list, read, write and edit files inside {SANDBOX_ROOT}. "
     "Give tool paths relative to that folder, e.g. 'notes.txt'. "
     "Changes to files are checked by a reviewer first; if one is blocked, "
     "you get the reason back and should not try to work around it."

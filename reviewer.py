@@ -1,4 +1,5 @@
 import json
+import logging
 
 import anthropic
 from anthropic.types import MessageParam, TextBlock, ToolUseBlock
@@ -6,6 +7,8 @@ from pydantic import BaseModel
 
 from config import REVIEWER_MODEL, REVIEWER_PROMPT, REVIEWER_HISTORY
 from messages import user_message
+
+logger = logging.getLogger(__name__)
 
 class Decision(BaseModel):
     allow: bool
@@ -40,6 +43,7 @@ class Reviewer:
             f"---\n\nThe assistant now wants to call the tool '{block.name}' with this input:\n"
             f"{json.dumps(block.input, indent=2)}"
         )
+        logger.debug("Asking reviewer:\n%s", proposal)
         try:
             # parse() makes the model answer in the shape of Decision, so we never parse text by hand
             response = self.client.messages.parse(
@@ -51,8 +55,10 @@ class Reviewer:
             )
         except anthropic.APIError as e:
             # If the reviewer can't answer, block the change: unsafe by default is worse
+            logger.exception("Reviewer API call failed, blocking the change")
             return Decision(allow=False, reason=f"Reviewer unavailable: {e}")
 
         if response.parsed_output is None:
+            logger.warning("Reviewer returned no decision (stop_reason=%s)", response.stop_reason)
             return Decision(allow=False, reason="Reviewer gave no decision")
         return response.parsed_output

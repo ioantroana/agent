@@ -4,6 +4,9 @@ from typing import ClassVar
 from anthropic.types import ToolParam
 from pydantic import BaseModel
 
+class ToolError(Exception):
+    """Raise this from a tool's run() for an expected failure. The message is sent to the model."""
+
 class Tool[InputT: BaseModel](ABC):
     """Base class for every tool. InputT is the Pydantic class for the tool's input."""
 
