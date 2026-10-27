@@ -2,7 +2,7 @@ import logging
 import os
 from datetime import datetime
 
-from config import LOG_DIR, LOG_LEVEL
+from config import LOG_DIR, LOG_LEVEL, LOG_PREVIEW_CHARS
 
 def setup_logging() -> str:
     """Send all log records to a new file for this run. Call once, at startup. Returns the file path."""
@@ -23,7 +23,7 @@ def setup_logging() -> str:
 
     return log_file
 
-def shorten(value: object, limit: int = 500) -> str:
+def shorten(value: object, limit: int = LOG_PREVIEW_CHARS) -> str:
     """Keep log lines readable when a value (like file content) is long."""
     text = str(value)
     return text if len(text) <= limit else f"{text[:limit]}... ({len(text)} chars)"

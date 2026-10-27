@@ -4,12 +4,12 @@ import time
 import anthropic
 from anthropic.types import Message, MessageParam, TextBlock, ToolResultBlockParam, ToolUseBlock
 
-from config import MODEL, MAX_TOKENS, SYSTEM_PROMPT
+from agent_ui import AgentUI
+from config import MAX_TOKENS, MODEL, SYSTEM_PROMPT
 from logging_setup import shorten
-from messages import tool_error, user_message
+from messages import ephemeral_cache, tool_error_result, user_message
 from reviewer import Reviewer
 from tools import get_definitions, needs_review, run_tool
-from ui import AgentUI
 
 logger = logging.getLogger(__name__)
 
@@ -39,29 +39,35 @@ class Agent:
 
     def _call_model(self) -> Message:
         """Send the conversation to the model, pass the reply to the UI as it streams in, and return it."""
-        logger.debug("Calling %s with %d messages", MODEL, len(self.messages))
+        logger.debug(f"Calling {MODEL} with {len(self.messages)} messages")
         started = time.perf_counter()
 
+        # The cache marker moves to the last block each call, so the next call reuses everything sent so far
         with self.client.messages.stream(
             model=MODEL,
             system=SYSTEM_PROMPT,
             max_tokens=MAX_TOKENS,
             messages=self.messages,
-            tools=get_definitions()
+            tools=get_definitions(),
+            cache_control=ephemeral_cache(),
         ) as stream:
             for chunk in stream.text_stream:
                 self.ui.text(chunk)
             response = stream.get_final_message()
         self.ui.text_done()
 
+        elapsed = time.perf_counter() - started
+        usage = response.usage
+        # input_tokens only counts the uncached part; the cache fields cover the rest
         logger.info(
-            "Response in %.1fs: stop_reason=%s, tokens in=%d out=%d",
-            time.perf_counter() - started, response.stop_reason, response.usage.input_tokens, response.usage.output_tokens,
+            f"Response in {elapsed:.1f}s: stop_reason={response.stop_reason}, "
+            f"tokens in={usage.input_tokens} out={usage.output_tokens} "
+            f"cache_write={usage.cache_creation_input_tokens or 0} cache_read={usage.cache_read_input_tokens or 0}"
         )
         text = "".join(block.text for block in response.content if isinstance(block, TextBlock))
         if text:
-            logger.info("AI: %s", shorten(text))
-            
+            logger.info(f"AI: {shorten(text)}")
+
         return response
 
     def _run_tools(self, response: Message) -> list[ToolResultBlockParam]:
@@ -71,10 +77,10 @@ class Agent:
     def _handle_tool_call(self, block: ToolUseBlock) -> ToolResultBlockParam:
         """Ask the reviewer if needed, then run the tool."""
         self.ui.tool_call(block.name, block.input)
-        logger.info("Tool call %s (id=%s): %s", block.name, block.id, shorten(block.input))
+        logger.info(f"Tool call {block.name} (id={block.id}): {shorten(block.input)}")
         if needs_review(block.name) and not self._is_allowed(block):
             # Don't tell the agent why, so it can't tailor a retry to slip past the reviewer
-            return tool_error(block, "Blocked by reviewer.")
+            return tool_error_result(block, "Blocked by reviewer.")
         return run_tool(block)
 
     def _is_allowed(self, block: ToolUseBlock) -> bool:
@@ -85,14 +91,16 @@ class Agent:
         decision = self.reviewer.review(self.messages, block)
         verdict = "allowed" if decision.allow else "BLOCKED"
         self.ui.review(block.name, decision.allow)
-        logger.log(logging.INFO if decision.allow else logging.WARNING,
-                   "Reviewer %s %s: %s", verdict, block.name, decision.reason)
+        logger.log(
+            logging.INFO if decision.allow else logging.WARNING,
+            f"Reviewer {verdict} {block.name}: {decision.reason}",
+        )
         if decision.allow:
             return True
 
         overridden = self.ui.confirm(f"The reviewer blocked {block.name}. Allow it anyway?")
         if overridden:
-            logger.warning("User overrode the reviewer: allowing %s", block.name)
+            logger.warning(f"User overrode the reviewer: allowing {block.name}")
         else:
-            logger.info("User kept the block on %s", block.name)
+            logger.info(f"User kept the block on {block.name}")
         return overridden

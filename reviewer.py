@@ -5,7 +5,7 @@ import anthropic
 from anthropic.types import MessageParam, TextBlock, ToolUseBlock
 from pydantic import BaseModel
 
-from config import REVIEWER_MODEL, REVIEWER_PROMPT, REVIEWER_HISTORY
+from config import REVIEWER_HISTORY, REVIEWER_MAX_TOKENS, REVIEWER_MODEL, REVIEWER_PROMPT
 from messages import user_message
 
 logger = logging.getLogger(__name__)
@@ -14,8 +14,8 @@ class Decision(BaseModel):
     allow: bool
     reason: str
 
-def build_transcript(messages: list[MessageParam]) -> str:
-    """Turn the conversation into plain 'User: ...' / 'Assistant: ...' lines.
+def _build_transcript(messages: list[MessageParam]) -> str:
+    """Turn the conversation into plain "User: ..." / "Assistant: ..." lines.
 
     Tool results (like file contents) are left out on purpose: they can contain
     text written by anyone, and we don't want that text steering the reviewer.
@@ -39,17 +39,17 @@ class Reviewer:
     def review(self, messages: list[MessageParam], block: ToolUseBlock) -> Decision:
         """Ask a second model whether this tool call should run. Returns a Decision."""
         proposal = (
-            f"Recent conversation:\n\n{build_transcript(messages)}\n\n"
+            f"Recent conversation:\n\n{_build_transcript(messages)}\n\n"
             f"---\n\nThe assistant now wants to call the tool '{block.name}' with this input:\n"
             f"{json.dumps(block.input, indent=2)}"
         )
-        logger.debug("Asking reviewer:\n%s", proposal)
+        logger.debug(f"Asking reviewer:\n{proposal}")
         try:
             # parse() makes the model answer in the shape of Decision, so we never parse text by hand
             response = self.client.messages.parse(
                 model=REVIEWER_MODEL,
                 system=REVIEWER_PROMPT,
-                max_tokens=1024,
+                max_tokens=REVIEWER_MAX_TOKENS,
                 messages=[user_message(proposal)],
                 output_format=Decision,
             )
@@ -59,6 +59,6 @@ class Reviewer:
             return Decision(allow=False, reason=f"Reviewer unavailable: {e}")
 
         if response.parsed_output is None:
-            logger.warning("Reviewer returned no decision (stop_reason=%s)", response.stop_reason)
+            logger.warning(f"Reviewer returned no decision (stop_reason={response.stop_reason})")
             return Decision(allow=False, reason="Reviewer gave no decision")
         return response.parsed_output

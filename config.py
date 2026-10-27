@@ -11,9 +11,13 @@ SANDBOX_ROOT = os.path.join(PROJECT_ROOT, "sandboxed")
 # Everything that happens is logged here, for debugging
 LOG_DIR = os.path.join(PROJECT_ROOT, "logs")  # each run writes its own file in here
 LOG_LEVEL = "DEBUG"  # DEBUG logs the most; INFO only the main events
+LOG_PREVIEW_CHARS = 500  # long values (like file content) are cut to this length in the log
 
 MODEL = "claude-haiku-5-5"
 MAX_TOKENS = 16000
+
+# A whole API request is capped at 32 MB, and base64 makes the file about a third bigger
+MAX_PDF_BYTES = 20 * 1024 * 1024
 
 SYSTEM_PROMPT = (
     f"You are a helpful assistant. The current working directory is {PROJECT_ROOT}. "
@@ -25,6 +29,7 @@ SYSTEM_PROMPT = (
 
 # The reviewer checks every change before it runs
 REVIEWER_MODEL = "claude-haiku-5-5"
+REVIEWER_MAX_TOKENS = 1024
 REVIEWER_PROMPT = (
     "You review file changes proposed by an AI assistant before they run. "
     "Allow the change if it matches what the user asked for and is safe. "
